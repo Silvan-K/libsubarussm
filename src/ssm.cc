@@ -9,23 +9,51 @@
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h>  // write(), read(), close()
 
-int main(int argc, char** argv)
-{
-  const int serial_port = open("/dev/ttyUSB0", O_RDWR);
-  
-  if (serial_port < 0)
-    std::cout << "Error " << errno
-	      << " from open: " << strerror(errno)
-	      << std::endl;
+class SSMTerminal {
 
+public:
+
+  SSMTerminal(const std::string& device_file);
+  ~SSMTerminal();
+
+  const unsigned char* ECUInit();
+
+private:
+
+  static void configureTerminal(const int& device_file);
+  
+  int m_file;
+
+  // TODO: check max packet size
+  unsigned char m_readbuf[256];
+};
+
+SSMTerminal::SSMTerminal(const std::string& device_file)
+{
+  m_file = open(device_file.c_str(), O_RDWR);
+  
+  if (m_file < 0)
+    std::cout << "Error " << errno << " from open: "
+	      << strerror(errno) << std::endl;
+}
+
+SSMTerminal::~SSMTerminal()
+{
+  close(m_file);
+}
+
+
+void SSMTerminal::configureTerminal(const int& file)
+{
   // Create new termios struct, fill with zeroes
   struct termios tty; memset(&tty, 0, sizeof tty);
 
   // Read in existing settings, and handle any error
-  if(tcgetattr(serial_port, &tty) != 0) {
-    printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
+  if(tcgetattr(file, &tty) != 0) {
+    throw("Error %i from tcgetattr: %s\n", errno, strerror(errno));
   }
 
+  // Set flags
   tty.c_cflag &= ~PARENB;        // Clear parity bit, disabling parity
   tty.c_cflag &= ~CSTOPB;        // Clear stop field, use only one stop bit
   tty.c_cflag |= CS8;            // 8 bits per byte
@@ -36,43 +64,59 @@ int main(int argc, char** argv)
   tty.c_lflag &= ~ECHOE;         // Disable erasure
   tty.c_lflag &= ~ECHONL;        // Disable new-line echo
   tty.c_lflag &= ~ISIG;          // Disable interpretation of INTR, QUIT and SUSP
-  tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off software flow control
-  tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // No
-								   // handling
-								   // of
-								   // received
-								   // bytes,
-								   // want
-								   // raw
-								   // data
-  tty.c_oflag &= ~OPOST;     // Prevent special interpretation of output bytes (e.g. newline chars)
-  tty.c_oflag &= ~ONLCR;     // Prevent conversion of newline to carriage return/line feed
-  // tty.c_oflag &= ~OXTABS; // Prevent conversion of tabs to spaces (NOT PRESENT IN LINUX)
-  // tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT IN LINUX)
-  tty.c_oflag &= ~OPOST;     // Prevent special interpretation of output bytes (e.g. newline chars)
-  tty.c_oflag &= ~ONLCR;     // Prevent conversion of newline to carriage return/line feed
-  // tty.c_oflag &= ~OXTABS; // Prevent conversion of tabs to spaces (NOT PRESENT IN LINUX)
-  // tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT IN LINUX)
-  
-  tty.c_cc[VTIME] = 10;      // Return as soon as any data is received. Wait for up to 1s (10 deciseconds)
+  tty.c_iflag &= ~(IXON  |       // Turn off software flow control
+		   IXOFF |
+		   IXANY);
+  tty.c_iflag &= ~(IGNBRK|BRKINT| // Don't handle incoming bytes, want raw data
+		   PARMRK|ISTRIP|
+		   INLCR|IGNCR|
+		   ICRNL);
+  tty.c_cc[VTIME] = 10;          // Return as soon as any data is received. Wait for up to 1s (10 deciseconds)
   tty.c_cc[VMIN]  = 0;
+  tty.c_oflag &= ~OPOST;         // Prevent special interpretation of output bytes (e.g. newline chars)
+  tty.c_oflag &= ~ONLCR;         // Prevent conversion of newline to carriage return/line feed
+  tty.c_oflag &= ~OPOST;         // Prevent special interpretation of output bytes (e.g. newline chars)
+  tty.c_oflag &= ~ONLCR;         // Prevent conversion of newline to carriage return/line feed
+  // tty.c_oflag &= ~OXTABS;     // Prevent conversion of tabs to spaces (NOT PRESENT IN LINUX)
+  // tty.c_oflag &= ~ONOEOT;     // Prevent removal of C-d chars (0x004) in output (NOT PRESENT IN LINUX)
+  // tty.c_oflag &= ~OXTABS;     // Prevent conversion of tabs to spaces (NOT PRESENT IN LINUX)
+  // tty.c_oflag &= ~ONOEOT;     // Prevent removal of C-d chars (0x004) in output (NOT PRESENT IN LINUX)
+  cfsetispeed(&tty, B4800);      // Set Baud rate to 4800
 
-  cfsetispeed(&tty, B4800);  // Set Baud rate to 4800
+  // Pass settings to port, check for error
+  if (tcsetattr(file, TCSANOW, &tty) != 0)
+     std::cout << "Error " << errno << " from tcsetattr: "
+	       << strerror(errno) << std::endl;
+}
 
-  // Save tty settings, also checking for error
-  if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
-    printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
-  }
+const unsigned char* SSMTerminal::ECUInit()
+{
+  unsigned char ecu_init[] = {0x80,  // Header
+			      0x10,  // Destination: ECU
+			      0xF0,  // Source: diagnostic tool
+  			      0x01,  // Number of bytes sending (excluding
+				     // checksum)
+			      0xBF,  // Command: ECU Init
+			      (0x80 + 0x10 + 0xF0 + 0x01 + 0xBF) & 0xff}; // Checksum
 
-  unsigned char msg[] = { 'H', 'e', 'l', 'l', 'o', '\r' };
-  write(serial_port, "Hello, world!", sizeof(msg));
+  write(m_file, ecu_init, sizeof(ecu_init));
 
-  // Allocate memory for read buffer, set size according to your needs
-  char read_buf [256];
-  memset(&read_buf, '\0', sizeof(read_buf));
+  // TODO: wait for expected number of bytes here, subject to timeout
+  sleep(1);
 
   // # of bytes read. 0 if no bytes received, negative to signal error
-  int n = read(serial_port, &read_buf, sizeof(read_buf));
+  const int n = read(m_file, &m_readbuf, sizeof(m_readbuf));
 
-  close(serial_port);
+  return m_readbuf;
+}
+
+int main(int argc, char** argv)
+{
+  SSMTerminal ecu("/dev/ttyUSB0");
+
+  const unsigned char* response = ecu.ECUInit();
+
+  for(int i(0); i<101; i++)
+    std::cout << (int)response[i] << std::endl;
+
 }
