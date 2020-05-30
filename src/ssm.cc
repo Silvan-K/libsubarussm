@@ -39,26 +39,28 @@ namespace SSM {
 
   public:
 
-    Port(const std::string& device_file);
+    Port(const std::string& device_file_path);
     ~Port();
 
     const unsigned char* ECUInit();
 
   private:
 
-    static void configureTerminal(const int& device_file);
+    static void configurePort(const int& device_file);
   
     int m_file;
     unsigned char m_readbuf[256];
   };
 
   
-  Port::Port(const std::string& device_file)
+  Port::Port(const std::string& device_file_path)
   {
-    m_file = open(device_file.c_str(), O_RDWR);
-  
-    if (m_file < 0)
-      throw(DeviceException(strerror(errno)));
+    // Open device file
+    m_file = open(device_file_path.c_str(), O_RDWR);
+    if (m_file<0) throw(DeviceException(strerror(errno)));
+
+    // Configure port
+    configurePort(m_file);
   }
 
   
@@ -68,18 +70,15 @@ namespace SSM {
   }
 
 
-  void Port::configureTerminal(const int& file)
+  void Port::configurePort(const int& file)
   {
-    // Create new termios struct, fill with zeroes
+    // Read in existing settings
     struct termios tty; memset(&tty, 0, sizeof tty);
+    if(tcgetattr(file, &tty)) throw(DeviceException(strerror(errno)));
 
-    // Read in existing settings, and handle any error
-    if(tcgetattr(file, &tty) != 0)
-      throw(DeviceException(strerror(errno)));
-
-    // Set flags
-    tty.c_cflag &= ~PARENB;        // Clear parity bit, disabling parity
-    tty.c_cflag &= ~CSTOPB;        // Clear stop field, use only one stop bit
+    // Modify settings
+    tty.c_cflag &= ~PARENB;        // Clear parity bit: disable parity
+    tty.c_cflag &= ~CSTOPB;        // Use one stop bit
     tty.c_cflag |= CS8;            // 8 bits per byte
     tty.c_cflag &= ~CRTSCTS;       // Disable RTS/CTS hardware flow control
     tty.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
@@ -91,14 +90,12 @@ namespace SSM {
     tty.c_iflag &= ~(IXON  |       // Turn off software flow control
 		     IXOFF |
 		     IXANY);
-    tty.c_iflag &= ~(IGNBRK|BRKINT| // Don't handle incoming bytes, want raw data
+    tty.c_iflag &= ~(IGNBRK|BRKINT| // Don't handle incoming bytes, get raw data
 		     PARMRK|ISTRIP|
 		     INLCR|IGNCR|
 		     ICRNL);
     tty.c_cc[VTIME] = 10;          // Return as soon as any data is received. Wait for up to 1s (10 deciseconds)
     tty.c_cc[VMIN]  = 0;
-    tty.c_oflag &= ~OPOST;         // Prevent special interpretation of output bytes (e.g. newline chars)
-    tty.c_oflag &= ~ONLCR;         // Prevent conversion of newline to carriage return/line feed
     tty.c_oflag &= ~OPOST;         // Prevent special interpretation of output bytes (e.g. newline chars)
     tty.c_oflag &= ~ONLCR;         // Prevent conversion of newline to carriage return/line feed
     // tty.c_oflag &= ~OXTABS;     // Prevent conversion of tabs to spaces (NOT PRESENT IN LINUX)
@@ -107,9 +104,8 @@ namespace SSM {
     // tty.c_oflag &= ~ONOEOT;     // Prevent removal of C-d chars (0x004) in output (NOT PRESENT IN LINUX)
     cfsetispeed(&tty, B4800);      // Set Baud rate to 4800
 
-    // Pass settings to port, check for error
-    if (tcsetattr(file, TCSANOW, &tty) != 0)
-      throw(DeviceException(strerror(errno)));
+    // Pass settings back to port
+    if (tcsetattr(file, TCSANOW, &tty)) throw(DeviceException(strerror(errno)));
   }
 
   const unsigned char* Port::ECUInit()
@@ -118,7 +114,7 @@ namespace SSM {
 				0x10,  // Destination: ECU
 				0xF0,  // Source: diagnostic tool
 				0x01,  // Number of bytes sending (excluding
-				// checksum)
+				       // checksum)
 				0xBF,  // Command: ECU Init
 				(0x80 + 0x10 + 0xF0 + 0x01 + 0xBF) & 0xff}; // Checksum
 
