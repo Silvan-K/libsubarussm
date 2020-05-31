@@ -1,7 +1,13 @@
+#include "observables.hh"
+#include "exceptions.hh"
+
 // C library headers
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
+#include <vector>
+#include <cstddef>
+#include <functional>
 
 // Linux headers
 #include <fcntl.h>   // Contains file controls like O_RDWR
@@ -11,30 +17,9 @@
 
 namespace SSM {
 
-  class Exception : public std::exception {
+  typedef std::byte Byte;
+  typedef std::vector<Byte> Bytes;
 
-  public:
-
-    Exception(std::string msg) : m_what(msg) {};
-    const char* what() const noexcept { return m_what.c_str(); };
-
-  private:
-    std::string m_what;
-  };
-
-  
-  class DeviceException : public Exception {
-  public:
-    DeviceException(std::string msg) : Exception(msg) {};
-  };
-
-
-  class UnexpectedResponse : public Exception {
-  public:
-    UnexpectedResponse(std::string msg) : Exception(msg) {};
-  };
-
-  
   class Port {
 
   public:
@@ -42,14 +27,13 @@ namespace SSM {
     Port(const std::string& device_file_path);
     ~Port();
 
-    const unsigned char* ECUInit();
-
   private:
 
     static void configurePort(const int& device_file);
+    Bytes ECUInit() const;
+    Bytes buildReadRequest(const Observables& observables) const;
   
     int m_file;
-    unsigned char m_readbuf[256];
   };
 
   
@@ -61,6 +45,8 @@ namespace SSM {
 
     // Configure port
     configurePort(m_file);
+
+    
   }
 
   
@@ -108,7 +94,8 @@ namespace SSM {
     if (tcsetattr(file, TCSANOW, &tty)) throw(DeviceException(strerror(errno)));
   }
 
-  const unsigned char* Port::ECUInit()
+
+  Bytes Port::ECUInit() const
   {
     unsigned char ecu_init[] = {0x80,  // Header
 				0x10,  // Destination: ECU
@@ -124,9 +111,18 @@ namespace SSM {
     sleep(1);
 
     // # of bytes read. 0 if no bytes received, negative to signal error
-    const int n = read(m_file, &m_readbuf, sizeof(m_readbuf));
+    Bytes response(256);
+    const int n = read(m_file, response.data(),
+		       sizeof(Bytes::value_type)*response.size());
 
-    return m_readbuf;
+    //return m_readbuf;
+    return response;
+  }
+
+
+  Bytes Port::buildReadRequest(const Observables& observables) const
+  {
+    return Bytes();
   }
 
 }
@@ -135,9 +131,5 @@ int main(int argc, char** argv)
 {
   SSM::Port ecu("/dev/ttyUSB0");
 
-  const unsigned char* response = ecu.ECUInit();
-
-  for(int i(0); i<101; i++)
-    std::cout << (int)response[i] << std::endl;
-
+  SSM::Observables observables {new SSM::BatteryVoltage()};
 }
