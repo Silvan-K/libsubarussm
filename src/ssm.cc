@@ -6,8 +6,6 @@
 #include <string.h>
 #include <iostream>
 #include <vector>
-#include <cstddef>
-#include <functional>
 
 // Linux headers
 #include <fcntl.h>   // Contains file controls like O_RDWR
