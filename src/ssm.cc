@@ -2,7 +2,6 @@
 #include "exceptions.hh"
 
 // C library headers
-#include <stdio.h>
 #include <string.h>
 #include <iostream>
 #include <vector>
@@ -10,9 +9,9 @@
 #include <assert.h>
 
 // Linux headers
-#include <fcntl.h>   // Contains file controls like O_RDWR
-#include <errno.h>   // Error integer and strerror() function
-#include <termios.h> // Contains POSIX terminal control definitions
+#include <fcntl.h>   // File controls (O_RDWR, ...)
+#include <errno.h>   // "errno" and strerror()
+#include <termios.h> // POSIX terminal control definitions
 #include <unistd.h>  // write(), read(), close()
 
 namespace SSM {
