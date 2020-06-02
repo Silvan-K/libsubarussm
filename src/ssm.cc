@@ -31,7 +31,8 @@ namespace SSM {
 
     static void configurePort(const int& device_file);
     Bytes ECUInit() const;
-    Bytes readPort(int num_bytes) const;
+    Bytes readBytes(int num_bytes) const;
+    Bytes readResponse(const Bytes& request) const;
     Bytes buildReadRequest(const Observables& observables,
 			   bool continuous_response) const;
     Byte checksum(const Bytes& input) const;
@@ -114,10 +115,10 @@ namespace SSM {
 
     // Response to ECU init is 68 bytes long (experimentally determined)
     write(m_file, request.data(), sizeof(Bytes::value_type)* request.size());
-    return readPort(68);
+    return readResponse(request);
   }
 
-  Bytes Port::readPort(int num_bytes) const
+  Bytes Port::readBytes(int num_bytes) const
   {
     Bytes response(num_bytes);
     int bufsize  = sizeof(Bytes::value_type)*response.size();
@@ -131,6 +132,33 @@ namespace SSM {
 	num_read += n;
       }
     return response;
+  }
+  
+  Bytes Port::readResponse(const Bytes& request) const
+  {
+    // Read echoed request
+    Bytes echo = readBytes(request.size());
+    assert(echo == request);
+    
+    // Read header of response: -header byte,
+    //                          -destination byte
+    //                          -source byte
+    //                          -datasize byte
+    Bytes header = readBytes(4);
+    uint8_t dsize = std::to_integer<uint8_t>(header.back());
+    assert(header.front() == HEADER);
+
+    // Now that dsize is known read response body (+1 for checksum byte)
+    Bytes body = readBytes(dsize+1);
+
+    // Validate checksum
+    uint8_t csum = std::to_integer<uint8_t>(body.back());
+    header.insert(header.end(), body.begin(), body.end()-1);
+    assert(csum == std::to_integer<uint8_t>(checksum(header)));
+
+    // Not sure what first byte in response is, discard and return
+    body.erase(body.begin());
+    return body;
   }
 
   Byte Port::checksum(const Bytes& input) const
@@ -175,15 +203,8 @@ namespace SSM {
     Bytes request = buildReadRequest(observables, false);
     write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
 
-    // TODO: wait for expected number of bytes here, subject to timeout
-    sleep(1);
-
-    // # of bytes read. 0 if no bytes received, negative to signal error
-    Bytes response(256);
-    const int n = read(m_file, response.data(),
-		       sizeof(Bytes::value_type)*response.size());
-
-    Bytes::const_iterator it = response.begin() + 5 + request.size();
+    Bytes response = readResponse(request);
+    Bytes::const_iterator it = response.begin();
     std::vector<double> ret;
     for(const auto& obs: observables)
       {
