@@ -234,7 +234,7 @@ namespace SSM {
     std::vector<double> values(observables.size());
     Bytes::const_iterator it;
 
-    for(int j(0); j<100; j++)
+    while(true)
       {
 	response = readECUPacket();
 
