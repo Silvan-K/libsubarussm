@@ -47,7 +47,6 @@ namespace SSM {
     static constexpr Byte SINGLE_RESP {0x00};  // Single response
     static constexpr Byte CONTIN_RESP {0x01};  // Continuous response
   };
-
   
   Port::Port(const std::string& device_file_path)
   {
@@ -62,12 +61,10 @@ namespace SSM {
     Bytes response = ECUInit();
   }
 
-  
   Port::~Port()
   {
     close(m_file);
   }
-
 
   void Port::configurePort(const int& file)
   {
@@ -107,7 +104,6 @@ namespace SSM {
     // Pass settings back to port
     if (tcsetattr(file, TCSANOW, &tty)) throw(DeviceException(strerror(errno)));
   }
-
 
   Bytes Port::ECUInit() const
   {
@@ -212,16 +208,15 @@ namespace SSM {
 
     Bytes response = readResponse(request);
     Bytes::const_iterator it = response.begin();
-    std::vector<double> ret;
+    std::vector<double> values;
     for(const auto& obs: observables)
       {
-	ret.push_back(obs->convert(it));
+	values.push_back(obs->convert(it));
 	it += obs->numBytes();
       }
     
-    return ret;
+    return values;
   }
-
 }
 
 int main(int argc, char** argv)
