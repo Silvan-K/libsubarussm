@@ -93,7 +93,8 @@ namespace SSM {
 		     PARMRK|ISTRIP|
 		     INLCR|IGNCR|
 		     ICRNL);
-    tty.c_cc[VTIME] = 10;          // Return as soon as any data is received. Wait for up to 1s (10 deciseconds)
+    tty.c_cc[VTIME] = 20;          // Return as soon as any data is received,
+				   // subject to timeout of 2s (20 deciseconds)
     tty.c_cc[VMIN]  = 0;
     tty.c_oflag &= ~OPOST;         // Prevent special interpretation of output bytes (e.g. newline chars)
     tty.c_oflag &= ~ONLCR;         // Prevent conversion of newline to carriage return/line feed
@@ -113,7 +114,6 @@ namespace SSM {
     Bytes request = {HEADER, DEST_ECU, SRC_DIAG, Byte(0x01), ECU_INIT};
     request.push_back(checksum(request));
 
-    // Response to ECU init is 68 bytes long (experimentally determined)
     write(m_file, request.data(), sizeof(Bytes::value_type)* request.size());
     return readResponse(request);
   }
@@ -128,6 +128,10 @@ namespace SSM {
     while(num_read < num_bytes)
       {
 	const int n = read(m_file, &(*offset), bufsize);
+
+	if (n<0) throw(DeviceException(strerror(errno)));
+	if (n==0) throw(ReadTimeout("Port read timed out"));
+
 	offset   += n;
 	num_read += n;
       }
