@@ -182,10 +182,9 @@ namespace SSM {
 	for(const auto& addr_byte: addr)
 	  addresses.push_back(addr_byte);
     
-    // Build the start of the read request. Add 2 to the number of bytes
-    // representing the addresses because the CMD_READ byte and the
-    // CONTIN_RESP/SINGLE_RESP bytes are to be included (not the checksum byte
-    // though)
+    // Build the header of read request. Datasize is number of addresses plus 2
+    // since CMD_READ and CONTIN_RESP/SINGLE_RESP bytes are to be included (not
+    // the checksum byte though)
     Bytes request = {HEADER,
 		     DEST_ECU,
 		     SRC_DIAG,
