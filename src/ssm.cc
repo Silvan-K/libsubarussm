@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 #include <cstddef>
-#include <assert.h>
+#include <functional>
 
 // Linux headers
 #include <fcntl.h>   // File controls (O_RDWR, ...)
@@ -16,7 +16,12 @@
 
 namespace SSM {
 
+  typedef std::vector<double> Values;
+
   class Port {
+
+    typedef std::function<int(const Observables& observables,
+			      const Values& values)> ReadValueCallback;
 
   public:
 
@@ -24,7 +29,8 @@ namespace SSM {
     ~Port();
 
     std::vector<double> singleRead(const Observables& observables) const;
-    void continuousRead(const Observables& observables);
+    void continuousRead(const Observables& observables,
+			ReadValueCallback callback) const;
 
   private:
 
@@ -215,7 +221,59 @@ namespace SSM {
     
     return values;
   }
+
+  void Port::continuousRead(const Observables& observables,
+			    ReadValueCallback callback) const
+  {
+    Bytes request = buildReadRequest(observables, true);
+    write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
+
+    Bytes response(0);
+    std::vector<double> values(observables.size());
+    Bytes::const_iterator it;
+
+    while(true)
+      {
+	response = readResponse(request);
+
+	it = response.begin();
+	for(int i(0); i< observables.size(); i++)
+	  {
+	    values[i] = observables[i]->convert(it);
+	    it += observables[i]->numBytes();
+	  }
+	if(callback(observables, values)) return;
+      }
+  }
 }
+
+#include <assert.h>
+
+class ResultHandler {
+
+public:
+
+  ResultHandler(int max_call) : m_callcount(0), m_maxcall(max_call) {}
+
+  int handle(const SSM::Observables& observables,
+	     const SSM::Values& results)
+  {
+    for(int i(0); i<results.size(); i++)
+      std::cout << results[i] << " " << observables[i]->unit() << std::endl;
+    
+    m_callcount +=1;
+
+    if(m_callcount==m_maxcall)
+      return 1;
+    
+    return 0;
+  };
+
+private: 
+  
+  int m_maxcall;
+  int m_callcount;
+};
 
 int main(int argc, char** argv)
 {
@@ -229,12 +287,19 @@ int main(int argc, char** argv)
 				 &engine_speed,
 				 &manifold_pressure };
 
-  while(true)
-    {
-      std::vector<double> values = ECU.singleRead(observables);
+  std::vector<double> values = ECU.singleRead(observables);
+  assert(observables.size() == values.size());
 
-      assert(observables.size() == values.size());
-      for(int i(0); i<values.size(); i++)
-	std::cout << values[i] << " " << observables[i]->unit() << std::endl;
-    }
+  std::cout << "Single read results:" << std::endl;
+  for(int i(0); i<values.size(); i++)
+    std::cout << values[i] << " " << observables[i]->unit() << std::endl;
+
+  ResultHandler handler(100);
+  auto callback = std::bind(&ResultHandler::handle, 
+			    &handler, 
+			    std::placeholders::_1,
+			    std::placeholders::_2);
+
+  std::cout << "\nStarting continuous read:" << std::endl;
+  ECU.continuousRead(observables, callback);
 }
