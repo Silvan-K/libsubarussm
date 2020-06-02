@@ -31,6 +31,7 @@ namespace SSM {
 
     static void configurePort(const int& device_file);
     Bytes ECUInit() const;
+    Bytes readPort(int num_bytes) const;
     Bytes buildReadRequest(const Observables& observables,
 			   bool continuous_response) const;
     Byte checksum(const Bytes& input) const;
@@ -58,12 +59,6 @@ namespace SSM {
 
     // Initialize communication with ECU
     Bytes response = ECUInit();
-
-    std::cout << "=================" << std::endl;
-    std::cout << "ECUInit response:" << std::endl;
-    for (Bytes::const_iterator it=response.begin(); it!=response.end(); ++it)
-      std::cout << std::to_integer<int>(*it) << std::endl;
-    std::cout << "=================" << std::endl;
   }
 
   
@@ -114,25 +109,27 @@ namespace SSM {
 
   Bytes Port::ECUInit() const
   {
-    unsigned char ecu_init[]= {0x80,  // Header
-			       0x10,  // Destination: ECU
-			       0xF0,  // Source: diagnostic tool
-			       0x01,  // Number of bytes sending (excluding
-			       // checksum)
-			       0xBF,  // Command: ECU Init
-			       (0x80 + 0x10 + 0xF0 + 0x01 + 0xBF) & 0xff}; // Checksum
+    Bytes request = {HEADER, DEST_ECU, SRC_DIAG, Byte(0x01), ECU_INIT};
+    request.push_back(checksum(request));
 
-    write(m_file, ecu_init, sizeof(ecu_init));
+    // Response to ECU init is 68 bytes long (experimentally determined)
+    write(m_file, request.data(), sizeof(Bytes::value_type)* request.size());
+    return readPort(68);
+  }
 
-    // TODO: wait for expected number of bytes here, subject to timeout
-    sleep(1);
-
-    // # of bytes read. 0 if no bytes received, negative to signal error
-    Bytes response(256);
-    const int n = read(m_file, response.data(),
-		       sizeof(Bytes::value_type)*response.size());
-
-    //return m_readbuf;
+  Bytes Port::readPort(int num_bytes) const
+  {
+    Bytes response(num_bytes);
+    int bufsize  = sizeof(Bytes::value_type)*response.size();
+    int num_read = 0;
+    
+    Bytes::iterator offset = response.begin();
+    while(num_read < num_bytes)
+      {
+	const int n = read(m_file, &(*offset), bufsize);
+	offset   += n;
+	num_read += n;
+      }
     return response;
   }
 
@@ -147,7 +144,7 @@ namespace SSM {
   Bytes Port::buildReadRequest(const Observables& observables,
 			       bool continuous) const
   {
-    // Add all read addresses to one byte vector
+    // Add all read addresses to a byte vector
     Bytes addresses;
     for(const auto& obs : observables)
       for(const auto& addr: obs->addresses())
@@ -176,7 +173,6 @@ namespace SSM {
   std::vector<double> Port::singleRead(const Observables& observables) const
   {
     Bytes request = buildReadRequest(observables, false);
-
     write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
 
     // TODO: wait for expected number of bytes here, subject to timeout
