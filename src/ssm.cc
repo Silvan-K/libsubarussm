@@ -6,6 +6,8 @@
 #include <string.h>
 #include <iostream>
 #include <vector>
+#include <cstddef>
+#include <assert.h>
 
 // Linux headers
 #include <fcntl.h>   // Contains file controls like O_RDWR
@@ -15,9 +17,6 @@
 
 namespace SSM {
 
-  typedef std::byte Byte;
-  typedef std::vector<Byte> Bytes;
-
   class Port {
 
   public:
@@ -25,13 +24,26 @@ namespace SSM {
     Port(const std::string& device_file_path);
     ~Port();
 
+    std::vector<double> singleRead(const Observables& observables) const;
+    void continuousRead(const Observables& observables);
+
   private:
 
     static void configurePort(const int& device_file);
     Bytes ECUInit() const;
-    Bytes buildReadRequest(const Observables& observables) const;
+    Bytes buildReadRequest(const Observables& observables,
+			   bool continuous_response) const;
+    Byte checksum(const Bytes& input) const;
   
     int m_file;
+
+    static constexpr Byte HEADER      {0x80};  // Package header
+    static constexpr Byte DEST_ECU    {0x10};  // Destination: ECU
+    static constexpr Byte SRC_DIAG    {0xF0};  // Source: diagnostic tool
+    static constexpr Byte ECU_INIT    {0xBF};  // Command: ECU init
+    static constexpr Byte CMD_READ    {0xA8};  // Read parameter(s)
+    static constexpr Byte SINGLE_RESP {0x00};  // Single response
+    static constexpr Byte CONTIN_RESP {0x01};  // Continuous response
   };
 
   
@@ -44,7 +56,14 @@ namespace SSM {
     // Configure port
     configurePort(m_file);
 
-    
+    // Initialize communication with ECU
+    Bytes response = ECUInit();
+
+    std::cout << "=================" << std::endl;
+    std::cout << "ECUInit response:" << std::endl;
+    for (Bytes::const_iterator it=response.begin(); it!=response.end(); ++it)
+      std::cout << std::to_integer<int>(*it) << std::endl;
+    std::cout << "=================" << std::endl;
   }
 
   
@@ -95,13 +114,13 @@ namespace SSM {
 
   Bytes Port::ECUInit() const
   {
-    unsigned char ecu_init[] = {0x80,  // Header
-				0x10,  // Destination: ECU
-				0xF0,  // Source: diagnostic tool
-				0x01,  // Number of bytes sending (excluding
-				       // checksum)
-				0xBF,  // Command: ECU Init
-				(0x80 + 0x10 + 0xF0 + 0x01 + 0xBF) & 0xff}; // Checksum
+    unsigned char ecu_init[]= {0x80,  // Header
+			       0x10,  // Destination: ECU
+			       0xF0,  // Source: diagnostic tool
+			       0x01,  // Number of bytes sending (excluding
+			       // checksum)
+			       0xBF,  // Command: ECU Init
+			       (0x80 + 0x10 + 0xF0 + 0x01 + 0xBF) & 0xff}; // Checksum
 
     write(m_file, ecu_init, sizeof(ecu_init));
 
@@ -117,17 +136,88 @@ namespace SSM {
     return response;
   }
 
-
-  Bytes Port::buildReadRequest(const Observables& observables) const
+  Byte Port::checksum(const Bytes& input) const
   {
-    return Bytes();
+    uint8_t sum = 0;
+    for(Bytes::const_iterator it = input.begin(); it != input.end(); ++it)
+      sum += std::to_integer<uint8_t>(*it);
+    return Byte(sum);
+  }
+
+  Bytes Port::buildReadRequest(const Observables& observables,
+			       bool continuous) const
+  {
+    // Add all read addresses to one byte vector
+    Bytes addresses;
+    for(const auto& obs : observables)
+      for(const auto& addr: obs->addresses())
+	for(const auto& addr_byte: addr)
+	  addresses.push_back(addr_byte);
+    
+    // Build the start of the read request. Add 2 to the numbre of bytes
+    // representing the addresses because the CMD_READ byte and the
+    // CONTIN_RESP/SINGLE_RESP bytes are to be included (not the checksum byte
+    // though)
+    Bytes request = {HEADER,
+		     DEST_ECU,
+		     SRC_DIAG,
+		     Byte(addresses.size()+2),
+		     CMD_READ,
+		     (continuous ? CONTIN_RESP : SINGLE_RESP)};
+
+    // Attach the addresses to read
+    request.insert(request.end(), addresses.begin(), addresses.end());
+
+    // Add the checksum byte and return
+    request.push_back(checksum(request));
+    return request;
+  }
+
+  std::vector<double> Port::singleRead(const Observables& observables) const
+  {
+    Bytes request = buildReadRequest(observables, false);
+
+    write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
+
+    // TODO: wait for expected number of bytes here, subject to timeout
+    sleep(1);
+
+    // # of bytes read. 0 if no bytes received, negative to signal error
+    Bytes response(256);
+    const int n = read(m_file, response.data(),
+		       sizeof(Bytes::value_type)*response.size());
+
+    Bytes::const_iterator it = response.begin() + 5 + request.size();
+    std::vector<double> ret;
+    for(const auto& obs: observables)
+      {
+	ret.push_back(obs->convert(it));
+	it += obs->numBytes();
+      }
+    
+    return ret;
   }
 
 }
 
 int main(int argc, char** argv)
 {
-  SSM::Port ecu("/dev/ttyUSB0");
+  SSM::Port ECU("/dev/ttyUSB0");
 
-  SSM::Observables observables {new SSM::BatteryVoltage()};
+  SSM::BatteryVoltage           battery_voltage;
+  SSM::EngineSpeed              engine_speed;
+  SSM::ManifoldRelativePressure manifold_pressure;
+
+  SSM::Observables observables { &battery_voltage,
+				 &engine_speed,
+				 &manifold_pressure };
+
+  while(true)
+    {
+      std::vector<double> values = ECU.singleRead(observables);
+
+      assert(observables.size() == values.size());
+      for(int i(0); i<values.size(); i++)
+	std::cout << values[i] << " " << observables[i]->unit() << std::endl;
+    }
 }
