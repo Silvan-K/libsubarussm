@@ -29,7 +29,7 @@ namespace SSM {
     Port(const std::string& device_file_path);
     ~Port();
 
-    std::vector<double> singleRead(const Observables& observables) const;
+    Values singleRead(const Observables& observables) const;
     void continuousRead(const Observables& observables,
 			ReadValueCallback callback) const;
 
@@ -209,13 +209,13 @@ namespace SSM {
     return request;
   }
 
-  std::vector<double> Port::singleRead(const Observables& observables) const
+  Values Port::singleRead(const Observables& observables) const
   {
     sendRequest(buildReadRequest(observables, false));
 
     Bytes response = readECUPacket();
     Bytes::const_iterator it = response.begin();
-    std::vector<double> values;
+    Values values;
     for(const auto& obs: observables)
       {
 	values.push_back(obs->convert(it));
@@ -231,7 +231,7 @@ namespace SSM {
     sendRequest(buildReadRequest(observables, true));
 
     Bytes response(0);
-    std::vector<double> values(observables.size());
+    Values values(observables.size());
     Bytes::const_iterator it;
 
     while(true)
@@ -260,7 +260,8 @@ public:
 	     const SSM::Values& results)
   {
     for(int i(0); i<results.size(); i++)
-      std::cout << results[i] << " " << observables[i]->unit() << std::endl;
+      std::cout << results[i] << " " 
+		<< observables[i]->unit() << std::endl;
     
     m_callcount +=1;
 
@@ -288,7 +289,7 @@ int main(int argc, char** argv)
 				 &engine_speed,
 				 &manifold_pressure };
 
-  std::vector<double> values = ECU.singleRead(observables);
+  SSM::Values values = ECU.singleRead(observables);
   assert(observables.size() == values.size());
 
   std::cout << "Single read results:" << std::endl;
