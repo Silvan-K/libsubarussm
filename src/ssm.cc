@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstddef>
 #include <functional>
+#include <assert.h>
 
 // Linux headers
 #include <fcntl.h>   // File controls (O_RDWR, ...)
@@ -35,9 +36,10 @@ namespace SSM {
   private:
 
     static void configurePort(const int& device_file);
+    void sendRequest(const Bytes& request) const;
     Bytes ECUInit() const;
     Bytes readBytes(int num_bytes) const;
-    Bytes readResponse(const Bytes& request) const;
+    Bytes readECUPacket() const;
     Bytes buildReadRequest(const Observables& observables,
 			   bool continuous_response) const;
     Byte checksum(const Bytes& input) const;
@@ -114,9 +116,8 @@ namespace SSM {
   {
     Bytes request = {HEADER, DEST_ECU, SRC_DIAG, Byte(0x01), ECU_INIT};
     request.push_back(checksum(request));
-
-    write(m_file, request.data(), sizeof(Bytes::value_type)* request.size());
-    return readResponse(request);
+    sendRequest(request);
+    return readECUPacket();
   }
 
   Bytes Port::readBytes(int num_bytes) const
@@ -139,17 +140,20 @@ namespace SSM {
     return response;
   }
   
-  Bytes Port::readResponse(const Bytes& request) const
+  void Port::sendRequest(const Bytes& request) const
   {
-    // Read echoed request
+    write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
     Bytes echo = readBytes(request.size());
     if(echo != request) 
       throw(UnexpectedResponse("ECU didn't echo request"));
-    
-    // Read header of response: -header byte,
-    //                          -destination byte
-    //                          -source byte
-    //                          -datasize byte
+  }
+
+  Bytes Port::readECUPacket() const
+  {
+    // Read header of packet: -header byte,
+    //                        -destination byte
+    //                        -source byte
+    //                        -datasize byte
     Bytes header = readBytes(4);
     uint8_t dsize = std::to_integer<uint8_t>(header.back());
     if(header.front() != HEADER) 
@@ -207,10 +211,9 @@ namespace SSM {
 
   std::vector<double> Port::singleRead(const Observables& observables) const
   {
-    Bytes request = buildReadRequest(observables, false);
-    write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
+    sendRequest(buildReadRequest(observables, false));
 
-    Bytes response = readResponse(request);
+    Bytes response = readECUPacket();
     Bytes::const_iterator it = response.begin();
     std::vector<double> values;
     for(const auto& obs: observables)
@@ -225,16 +228,15 @@ namespace SSM {
   void Port::continuousRead(const Observables& observables,
 			    ReadValueCallback callback) const
   {
-    Bytes request = buildReadRequest(observables, true);
-    write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
+    sendRequest(buildReadRequest(observables, true));
 
     Bytes response(0);
     std::vector<double> values(observables.size());
     Bytes::const_iterator it;
 
-    while(true)
+    for(int j(0); j<100; j++)
       {
-	response = readResponse(request);
+	response = readECUPacket();
 
 	it = response.begin();
 	for(int i(0); i< observables.size(); i++)
@@ -247,7 +249,6 @@ namespace SSM {
   }
 }
 
-#include <assert.h>
 
 class ResultHandler {
 
