@@ -142,7 +142,8 @@ namespace SSM {
   {
     // Read echoed request
     Bytes echo = readBytes(request.size());
-    assert(echo == request);
+    if(echo != request) 
+      throw(UnexpectedResponse("ECU didn't echo request"));
     
     // Read header of response: -header byte,
     //                          -destination byte
@@ -150,7 +151,8 @@ namespace SSM {
     //                          -datasize byte
     Bytes header = readBytes(4);
     uint8_t dsize = std::to_integer<uint8_t>(header.back());
-    assert(header.front() == HEADER);
+    if(header.front() != HEADER) 
+      throw(UnexpectedResponse("Response header missing"));
 
     // Now that dsize is known read response body (+1 for checksum byte)
     Bytes body = readBytes(dsize+1);
@@ -158,7 +160,8 @@ namespace SSM {
     // Validate checksum
     uint8_t csum = std::to_integer<uint8_t>(body.back());
     header.insert(header.end(), body.begin(), body.end()-1);
-    assert(csum == std::to_integer<uint8_t>(checksum(header)));
+    if(csum != std::to_integer<uint8_t>(checksum(header)))
+      throw(UnexpectedResponse("Checksum validation failed"));
 
     // Not sure what first byte in response is, discard and return
     body.erase(body.begin());
