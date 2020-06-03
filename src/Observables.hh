@@ -1,12 +1,7 @@
-#include <array>
-#include <vector>
+#include "bytes.hh"
 #include <cstddef>
 
 namespace SSM {
-
-  typedef std::byte Byte;
-  typedef std::vector<Byte> Bytes;
-  typedef std::array<std::byte, 3> Address;
 
   // Abstract base class
   

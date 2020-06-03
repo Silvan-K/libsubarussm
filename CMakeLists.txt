@@ -7,5 +7,5 @@ project(libsubarussm)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Add the executable
-add_executable(ssm ../src/ssm.cc)
+# Add src subdirectory
+add_subdirectory(src)

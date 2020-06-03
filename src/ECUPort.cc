@@ -1,12 +1,10 @@
-#include "observables.hh"
+#include "ECUPort.hh"
 #include "exceptions.hh"
 
 // C library headers
 #include <string.h>
 #include <iostream>
-#include <vector>
 #include <cstddef>
-#include <functional>
 #include <assert.h>
 
 // Linux headers
@@ -17,45 +15,6 @@
 
 namespace SSM {
 
-  typedef std::vector<double> Values;
-
-  class ECUPort {
-
-    typedef std::function<int(const Observables& observables,
-			      const Values& values)> ReadValueCallback;
-
-  public:
-
-    ECUPort(const std::string& device_file_path);
-    ~ECUPort();
-
-    Values singleRead(const Observables& observables) const;
-    void continuousRead(const Observables& observables,
-			ReadValueCallback callback) const;
-
-  private:
-
-    static void configurePort(const int& device_file);
-    void  sendRequest(const Bytes& request) const;
-    void  flushBuffer() const;
-    Bytes ECUInit() const;
-    Bytes readBytes(int num_bytes) const;
-    Bytes readECUPacket() const;
-    Bytes buildReadRequest(const Observables& observables,
-			   bool continuous_response) const;
-    Byte  checksum(const Bytes& input) const;
-  
-    int m_file;
-
-    static constexpr Byte HEADER      {0x80};  // Package header
-    static constexpr Byte DEST_ECU    {0x10};  // Destination: ECU
-    static constexpr Byte SRC_DIAG    {0xF0};  // Source: diagnostic tool
-    static constexpr Byte ECU_INIT    {0xBF};  // Command: ECU init
-    static constexpr Byte CMD_READ    {0xA8};  // Read parameter(s)
-    static constexpr Byte SINGLE_RESP {0x00};  // Single response
-    static constexpr Byte CONTIN_RESP {0x01};  // Continuous response
-  };
-  
   ECUPort::ECUPort(const std::string& device_file_path)
   {
     // Open device file
@@ -256,62 +215,4 @@ namespace SSM {
     if (tcsetattr(file, TCSANOW, &tty))
       throw(DeviceException(strerror(errno)));
   }
-}
-
-class ResultHandler {
-
-public:
-
-  ResultHandler(int max_call) : m_callcount(0), m_maxcall(max_call) {}
-
-  int handle(const SSM::Observables& observables,
-	     const SSM::Values& results)
-  {
-    for(int i(0); i<results.size(); i++)
-      std::cout << results[i] << " " 
-		<< observables[i]->unit() << std::endl;
-    
-    m_callcount +=1;
-
-    if(m_callcount==m_maxcall)
-      return 1;
-    
-    return 0;
-  };
-
-private: 
-  
-  int m_maxcall;
-  int m_callcount;
-};
-
-int main(int argc, char** argv)
-{
-  SSM::ECUPort ECU("/dev/ttyUSB0");
-
-  SSM::BatteryVoltage           battery_voltage;
-  SSM::EngineSpeed              engine_speed;
-  SSM::ManifoldRelativePressure manifold_pressure;
-  SSM::ExhaustGasTemperature    exhaust_gas_temp;
-
-  SSM::Observables observables { &battery_voltage,
-				 &engine_speed,
-				 &manifold_pressure,
-				 &exhaust_gas_temp };
-
-  SSM::Values values = ECU.singleRead(observables);
-  assert(observables.size() == values.size());
-
-  std::cout << "Single read results:" << std::endl;
-  for(int i(0); i<values.size(); i++)
-    std::cout << values[i] << " " << observables[i]->unit() << std::endl;
-
-  ResultHandler handler(100);
-  auto callback = std::bind(&ResultHandler::handle, 
-			    &handler, 
-			    std::placeholders::_1,
-			    std::placeholders::_2);
-
-  std::cout << "\nStarting continuous read:" << std::endl;
-  ECU.continuousRead(observables, callback);
 }

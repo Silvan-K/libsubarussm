@@ -21,4 +21,10 @@ namespace SSM {
   public:
     UnexpectedResponse(std::string msg) : Exception(msg) {};
   };
+
+  class ReadTimeout : public Exception {
+
+  public:
+    ReadTimeout(std::string msg) : Exception(msg) {};
+  };
 }
