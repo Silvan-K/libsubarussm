@@ -40,9 +40,9 @@ namespace SSM {
   public:
     double convert(Bytes::const_iterator input) const override
     {
-      uint8_t raw0 = std::to_integer<uint8_t>(*(input+0));
-      uint8_t raw1 = std::to_integer<uint8_t>(*(input+1));
-      return convert(raw0 | (raw1 << 8));
+      uint16_t raw0 = std::to_integer<uint16_t>(*(input+0));
+      uint16_t raw1 = std::to_integer<uint16_t>(*(input+1));
+      return convert((raw0 << 8) | raw1);
     }
     int numBytes() const override { return 2; }
   private:
@@ -91,8 +91,8 @@ namespace SSM {
   public:
     std::string unit() const override { return "RPM"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0F}},
-	       Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0E}}}; }
+    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0E}},
+	       Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0F}}}; }
   private:
     double convert(uint16_t value) const override { return value*0.25; };
   };
