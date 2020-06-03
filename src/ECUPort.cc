@@ -1,5 +1,5 @@
 #include "ECUPort.hh"
-#include "exceptions.hh"
+#include "Exceptions.hh"
 
 // C library headers
 #include <string.h>
