@@ -1,3 +1,5 @@
+#pragma once
+
 namespace SSM {
 
   class Exception : public std::exception {

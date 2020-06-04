@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Bytes.hh"
 #include "Observables.hh"
 
