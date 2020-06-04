@@ -9,5 +9,5 @@ target_link_libraries(SSMExample PUBLIC subarussm)
 
 # Install rules
 install(TARGETS  subarussm DESTINATION lib/subarussm)
-install(FILES ECUPort.hh Observables.hh Exceptions.hh DESTINATION include/subarussm/)
+install(FILES ECUPort.hh Observables.hh Bytes.hh Exceptions.hh DESTINATION include/subarussm/)
 install(TARGETS SSMExample DESTINATION bin/subarussm)
