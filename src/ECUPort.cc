@@ -1,11 +1,10 @@
+// Package headers
 #include "ECUPort.hh"
 #include "Exceptions.hh"
 
-// C library headers
+// Standard C++ headers
 #include <string.h>
-#include <iostream>
 #include <cstddef>
-#include <assert.h>
 
 // Linux headers
 #include <fcntl.h>   // File controls (O_RDWR, ...)
@@ -35,11 +34,10 @@ namespace SSM {
 
   Bytes ECUPort::ECUInit() const
   {
-    flushBuffer();
-    Bytes request = {HEADER, DEST_ECU, SRC_DIAG, Byte(0x01), ECU_INIT};
+    Bytes request = {HEADER, ECU, TOOL, Byte(0x01), ECU_INIT};
     request.push_back(checksum(request));
     sendRequest(request);
-    return readECUPacket();
+    return readECUPacket(false);
   }
 
   Bytes ECUPort::readBytes(int num_bytes) const
@@ -62,52 +60,59 @@ namespace SSM {
     return response;
   }
 
-  void ECUPort::flushBuffer() const
-  {
-    Bytes buffer(256);
-    const int bufsize = sizeof(Bytes::value_type)*buffer.size();
-    while (read(m_file, buffer.data(), bufsize) > 0) {}
-  }
-  
   void ECUPort::sendRequest(const Bytes& request) const
   {
     write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
-    Bytes echo = readBytes(request.size());
-    if(echo != request) 
+    Bytes echo = readECUPacket(true);
+    if(echo != request)
       throw(UnexpectedResponse("ECU didn't echo request"));
   }
 
-  Bytes ECUPort::readECUPacket() const
+  Bytes ECUPort::readECUPacket(bool echo) const
   {
-    // Read header of packet: -header byte,
-    //                        -destination byte
-    //                        -source byte
-    //                        -datasize byte
-    Bytes header = readBytes(4);
-    uint8_t dsize = std::to_integer<uint8_t>(header.back());
-    if(header.front() != HEADER) 
-      throw(UnexpectedResponse("Response header missing"));
+    // Skip until we receive next complete package
+    // Expected header of packet: -header byte,
+    //                            -destination byte
+    //                            -source byte
+    //                            -datasize byte
+    Bytes header(4);
+    Byte SRC(ECU),DEST(TOOL);
+    if(echo) std::swap(SRC, DEST);
+    while(true)
+      {
+	header[0] = readBytes(1)[0];
+	if (header[0] != HEADER) continue;
 
-    // Now that dsize is known read response body (+1 for checksum byte)
-    Bytes body = readBytes(dsize+1);
+	header[1] = readBytes(1)[0];
+	if (header[1] != DEST) continue;
+
+	header[2] = readBytes(1)[0];
+	if (header[2] != SRC) continue;
+
+	header[3] = readBytes(1)[0];
+	break;
+      }
+
+    // Now that dsize is known read response body and checksum
+    uint8_t dsize = std::to_integer<uint8_t>(header.back());
+    Bytes body = readBytes(dsize); Byte csum = readBytes(1)[0];
 
     // Validate checksum
-    uint8_t csum = std::to_integer<uint8_t>(body.back());
-    header.insert(header.end(), body.begin(), body.end()-1);
-    if(csum != std::to_integer<uint8_t>(checksum(header)))
+    body.insert(body.begin(), header.begin(), header.end());
+    if(csum != checksum(body))
       throw(UnexpectedResponse("Checksum validation failed"));
 
-    // Not sure what first byte in response is, discard and return
-    body.erase(body.begin());
+    // Add the checksum and return
+    body.push_back(csum);
     return body;
   }
 
   Byte ECUPort::checksum(const Bytes& input) const
   {
-    uint8_t sum = 0;
-    for(Bytes::const_iterator it = input.begin(); it != input.end(); ++it)
-      sum += std::to_integer<uint8_t>(*it);
-    return Byte(sum);
+    uint32_t sum = 0;
+    for(const auto& b: input)
+      sum += std::to_integer<uint32_t>(b);
+    return Byte(sum & 0x00001111);
   }
 
   Bytes ECUPort::buildReadRequest(const Observables& observables,
@@ -124,8 +129,8 @@ namespace SSM {
     // since CMD_READ and CONTIN_RESP/SINGLE_RESP bytes are to be included (not
     // the checksum byte though)
     Bytes request = {HEADER,
-		     DEST_ECU,
-		     SRC_DIAG,
+		     ECU,
+		     TOOL,
 		     Byte(addresses.size()+2),
 		     CMD_READ,
 		     (continuous ? CONTIN_RESP : SINGLE_RESP)};
@@ -142,8 +147,8 @@ namespace SSM {
   {
     sendRequest(buildReadRequest(observables, false));
 
-    Bytes response = readECUPacket();
-    Bytes::const_iterator it = response.begin();
+    Bytes response = readECUPacket(false);
+    Bytes::const_iterator it = response.begin() + 5;
     Values values;
     for(const auto& obs: observables)
       {
@@ -165,9 +170,8 @@ namespace SSM {
 
     while(true)
       {
-	response = readECUPacket();
-
-	it = response.begin();
+	response = readECUPacket(false);
+	it = response.begin() + 5;
 	for(int i(0); i< observables.size(); i++)
 	  {
 	    values[i] = observables[i]->convert(it);

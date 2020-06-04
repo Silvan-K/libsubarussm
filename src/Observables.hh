@@ -64,6 +64,36 @@ namespace SSM {
     double convert(uint8_t value) const override { return value*0.08; };
   };
 
+  // TODO: Fix this
+  // Air/Fuel Lean Correction
+  // 8 bit value
+  // P0x036 = low byte
+  // Divide value by 2.55 to get percent
+
+  class AirFuelLeanCorrection : public OneByteObservable {
+  public:
+    std::string unit() const override { return "%"; }
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x36}}}; }
+  private:
+    double convert(uint8_t value) const override { return value/2.55; };
+  };
+
+  // Coolant Temperature
+  // 8 bit value
+  // P0x008 = low byte
+  // Subtract 40 from value to get Degrees C
+
+  class CoolantTemperature : public OneByteObservable {
+  public:
+    std::string unit() const override { return "C"; }
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x0}, std::byte{0x00}, std::byte{0x08}}}; }
+  private:
+    double convert(uint8_t value) const override { return (value-40.0); };
+  };
+  
+  // TODO: Fix this
   // Exhaust Gas Temperature
   // 8 bit value
   // P0x106 = low byte
@@ -73,9 +103,9 @@ namespace SSM {
   public:
     std::string unit() const override { return "C"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x01}, std::byte{0x06}}}; }
+    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0xA6}}}; }
   private:
-    double convert(uint8_t value) const override { return (value*+40.0)*5.0; };
+    double convert(uint8_t value) const override { return (value+40.0)*5.0; };
   };
 
   // Manifold Relative Pressure

@@ -28,10 +28,9 @@ namespace SSM {
 
     static void configurePort(const int& device_file);
     void  sendRequest(const Bytes& request) const;
-    void  flushBuffer() const;
     Bytes ECUInit() const;
     Bytes readBytes(int num_bytes) const;
-    Bytes readECUPacket() const;
+    Bytes readECUPacket(bool echo) const;
     Bytes buildReadRequest(const Observables& observables,
 			   bool continuous_response) const;
     Byte  checksum(const Bytes& input) const;
@@ -39,8 +38,8 @@ namespace SSM {
     int m_file;
 
     static constexpr Byte HEADER      {0x80};  // Package header
-    static constexpr Byte DEST_ECU    {0x10};  // Destination: ECU
-    static constexpr Byte SRC_DIAG    {0xF0};  // Source: diagnostic tool
+    static constexpr Byte ECU         {0x10};  // Device: ECU
+    static constexpr Byte TOOL        {0xF0};  // Device: diagnostic tool
     static constexpr Byte ECU_INIT    {0xBF};  // Command: ECU init
     static constexpr Byte CMD_READ    {0xA8};  // Read parameter(s)
     static constexpr Byte SINGLE_RESP {0x00};  // Single response
