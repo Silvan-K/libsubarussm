@@ -125,9 +125,9 @@ namespace SSM {
 
   Byte ECUPort::checksum(const Bytes& input) const
   {
-    uint32_t sum = 0;
+    uint8_t sum = 0;
     for(const auto& b: input)
-      sum += std::to_integer<uint32_t>(b);
+      sum += std::to_integer<uint8_t>(b);
     return Byte(sum);
   }
 
