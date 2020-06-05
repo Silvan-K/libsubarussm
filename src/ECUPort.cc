@@ -5,6 +5,7 @@
 // Standard C++ headers
 #include <string.h>
 #include <cstddef>
+#include <iostream>
 
 // Linux headers
 #include <fcntl.h>   // File controls (O_RDWR, ...)
@@ -109,14 +110,14 @@ namespace SSM {
 
   Byte ECUPort::checksum(const Bytes& input) const
   {
-    uint32_t sum = 0;
+    uint16_t sum = 0;
     for(const auto& b: input)
-      sum += std::to_integer<uint32_t>(b);
-    return Byte(sum & 0x00001111);
+      sum += std::to_integer<uint16_t>(b);
+    return Byte(sum);
   }
 
   Bytes ECUPort::buildReadRequest(const Observables& observables,
-			       bool continuous) const
+				  bool continuous) const
   {
     // Add all read addresses to a byte vector
     Bytes addresses;
