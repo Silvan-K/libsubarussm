@@ -61,12 +61,27 @@ namespace SSM {
     return response;
   }
 
-  void ECUPort::sendRequest(const Bytes& request) const
+  void ECUPort::sendRequest(const Bytes& request, int max_try) const
   {
-    write(m_file, request.data(), request.size()*sizeof(Bytes::value_type));
-    Bytes echo = readECUPacket(true);
-    if(echo != request)
-      throw(UnexpectedResponse("ECU didn't echo request"));
+    int request_size = request.size()*sizeof(Bytes::value_type);
+    Bytes echo(0);
+    for(int i(0); i<max_try; i++)
+      {
+	write(m_file, request.data(), request_size);
+	try { echo = readECUPacket(true); }
+	catch(ReadTimeout)
+	  {
+	    std::cerr << "Timed out waiting for echo" << std::endl;
+	    continue;
+	  }
+	if(echo != request)
+	  {
+	    std::cerr << "Echo not matching request" << std::endl;
+	    continue;
+	  }
+	return;
+      }
+    throw(UnexpectedResponse("ECU didn't echo request"));
   }
 
   Bytes ECUPort::readECUPacket(bool echo) const
@@ -110,9 +125,9 @@ namespace SSM {
 
   Byte ECUPort::checksum(const Bytes& input) const
   {
-    uint16_t sum = 0;
+    uint32_t sum = 0;
     for(const auto& b: input)
-      sum += std::to_integer<uint16_t>(b);
+      sum += std::to_integer<uint32_t>(b);
     return Byte(sum);
   }
 
@@ -161,7 +176,7 @@ namespace SSM {
   }
 
   void ECUPort::continuousRead(const Observables& observables,
-			    ReadValueCallback callback) const
+			       ReadValueCallback callback) const
   {
     sendRequest(buildReadRequest(observables, true));
 
@@ -171,7 +186,11 @@ namespace SSM {
 
     while(true)
       {
-	response = readECUPacket(false);
+	try { response = readECUPacket(false);}
+	catch(UnexpectedResponse) {
+	  std::cerr << "Unexpected response, ignoring package" << std::endl;
+	  continue;
+	}
 	it = response.begin() + 5;
 	for(int i(0); i< observables.size(); i++)
 	  {
