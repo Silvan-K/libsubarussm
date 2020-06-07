@@ -13,19 +13,16 @@ namespace SSM {
   };
 
   class DeviceException : public Exception {
-
   public:
     DeviceException(std::string msg) : Exception(msg) {};
   };
 
-  class UnexpectedResponse : public Exception {
-
+  class InvalidChecksum : public Exception {
   public:
-    UnexpectedResponse(std::string msg) : Exception(msg) {};
+    InvalidChecksum(std::string msg) : Exception(msg) {};
   };
 
   class ReadTimeout : public Exception {
-
   public:
     ReadTimeout(std::string msg) : Exception(msg) {};
   };

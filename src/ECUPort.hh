@@ -27,7 +27,7 @@ namespace SSM {
   private:
 
     static void configurePort(const int& device_file);
-    void  sendRequest(const Bytes& request, int max_try=5) const;
+    void  sendRequest(const Bytes& request, int max_try=3) const;
     Bytes ECUInit() const;
     Bytes readBytes(int num_bytes) const;
     Bytes readECUPacket(bool echo) const;

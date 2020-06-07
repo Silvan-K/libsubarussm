@@ -65,23 +65,22 @@ namespace SSM {
   {
     int request_size = request.size()*sizeof(Bytes::value_type);
     Bytes echo(0);
-    for(int i(0); i<max_try; i++)
+
+    // First attempts: catch retry upon timeouts and wrong echoes
+    for(int i(0); i<max_try-1; i++)
       {
 	write(m_file, request.data(), request_size);
 	try { echo = readECUPacket(true); }
-	catch(ReadTimeout)
-	  {
-	    std::cerr << "Timed out waiting for echo" << std::endl;
-	    continue;
-	  }
-	if(echo != request)
-	  {
-	    std::cerr << "Echo not matching request" << std::endl;
-	    continue;
-	  }
+	catch(ReadTimeout)  { continue; }
+	if(echo != request) { continue; }
 	return;
       }
-    throw(UnexpectedResponse("ECU didn't echo request"));
+
+    // Last attempt: let fail if any error
+    write(m_file, request.data(), request_size);
+    echo = readECUPacket(true);
+    if(echo != request)
+      throw DeviceException("ECU didn't echo request");
   }
 
   Bytes ECUPort::readECUPacket(bool echo) const
@@ -116,7 +115,7 @@ namespace SSM {
     // Validate checksum
     body.insert(body.begin(), header.begin(), header.end());
     if(csum != checksum(body))
-      throw(UnexpectedResponse("Checksum validation failed"));
+      throw(InvalidChecksum("Checksum validation failed"));
 
     // Add the checksum and return
     body.push_back(csum);
@@ -187,10 +186,7 @@ namespace SSM {
     while(true)
       {
 	try { response = readECUPacket(false);}
-	catch(UnexpectedResponse) {
-	  std::cerr << "Unexpected response, ignoring package" << std::endl;
-	  continue;
-	}
+	catch(InvalidChecksum) { continue; }
 	it = response.begin() + 5;
 	for(int i(0); i< observables.size(); i++)
 	  {
