@@ -2,6 +2,7 @@
 
 #include "Bytes.hh"
 #include <cstddef>
+#include <string>
 
 namespace SSM {
 
