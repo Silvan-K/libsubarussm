@@ -14,8 +14,8 @@ namespace SSM {
     virtual std::string unit() const = 0;
     virtual std::vector<Address> addresses() const = 0;
     virtual int numBytes()  const = 0;
-    virtual int makerBit()  const = 0;
-    virtual int makerByte() const = 0;
+    virtual int markerBit()  const = 0;
+    virtual int markerByte() const = 0;
   };
 
   typedef std::vector<const SSM::Observable*> Observables;
@@ -63,8 +63,8 @@ namespace SSM {
     std::string unit() const override { return "Volt"; }
     std::vector<Address> addresses() const override
     { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x1C}}}; }
-    int makerByte() const override { return 11;} 
-    int makerBit()  const override { return  7;} 
+    int markerByte() const override { return 11;} 
+    int markerBit()  const override { return  7;} 
   private:
     double convert(uint8_t value) const override { return value*0.08; };
   };
@@ -80,8 +80,8 @@ namespace SSM {
     std::string unit() const override { return "%"; }
     std::vector<Address> addresses() const override
     { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x36}}}; }
-    int makerByte() const override { return 14;}
-    int makerBit()  const override { return  5;}
+    int markerByte() const override { return 14;}
+    int markerBit()  const override { return  5;}
   private:
     double convert(uint8_t value) const override { return value/2.55; };
   };
@@ -96,8 +96,8 @@ namespace SSM {
     std::string unit() const override { return "C"; }
     std::vector<Address> addresses() const override
     { return { Address{std::byte{0x0}, std::byte{0x00}, std::byte{0x08}}}; }
-    int makerByte() const override { return 9;}
-    int makerBit()  const override { return 6;}
+    int markerByte() const override { return 9;}
+    int markerBit()  const override { return 6;}
   private:
     double convert(uint8_t value) const override { return (value-40.0); };
   };
@@ -113,8 +113,8 @@ namespace SSM {
     std::string unit() const override { return "C"; }
     std::vector<Address> addresses() const override
     { return { Address{std::byte{0x00}, std::byte{0x01}, std::byte{0x06}}}; }
-    int makerByte() const override { return 41;}
-    int makerBit()  const override { return  1;}
+    int markerByte() const override { return 41;}
+    int markerBit()  const override { return  1;}
   private:
     double convert(uint8_t value) const override { return (value+40.0)*5.0; };
   };
@@ -129,8 +129,8 @@ namespace SSM {
     std::string unit() const override { return "kPa"; }
     std::vector<Address> addresses() const override
     { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x24}}}; }
-    int makerByte() const override { return 12;}
-    int makerBit()  const override { return  7;}
+    int markerByte() const override { return 12;}
+    int markerBit()  const override { return  7;}
   private:
     double convert(uint8_t value) const override { return (value-128.0)*37/255; };
   };
@@ -147,8 +147,8 @@ namespace SSM {
     std::vector<Address> addresses() const override
     { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0E}},
 	       Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0F}}}; }
-    int makerByte() const override { return 9;}
-    int makerBit()  const override { return 0;}
+    int markerByte() const override { return 9;}
+    int markerBit()  const override { return 0;}
   private:
     double convert(uint16_t value) const override { return value*0.25; };
   };

@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 
   std::cout << "Single read results:" << std::endl;
   for(int i(0); i<values.size(); i++)
-    std::cout << values[i] << " " << observables[i]->unit() << std::endl;
+    std::cout << ECU.isAvailable(*observables[i]) << " | " << values[i] << " " << observables[i]->unit() << std::endl;
 
   ResultHandler handler(100);
   auto callback = std::bind(&ResultHandler::handle, 
