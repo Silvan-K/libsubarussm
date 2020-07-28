@@ -1,17 +1,14 @@
-// Package headers
 #include "ECUPort.hh"
 #include "Exceptions.hh"
 
-// Standard C++ headers
 #include <string.h>
 #include <cstddef>
 #include <iostream>
 
-// Linux headers
-#include <fcntl.h>   // File controls (O_RDWR, ...)
-#include <errno.h>   // "errno" and strerror()
-#include <termios.h> // POSIX terminal control definitions
-#include <unistd.h>  // write(), read(), close()
+#include <fcntl.h>
+#include <errno.h>
+#include <termios.h>
+#include <unistd.h>
 
 namespace SSM {
 
@@ -25,12 +22,27 @@ namespace SSM {
     configurePort(m_file);
 
     // Initialize communication with ECU
-    Bytes response = ECUInit();
+    m_init_response = ECUInit();
+
+    // The ECU identifier is part of the response. 
+    Bytes::const_iterator it = skipToData(m_init_response);
+    m_ecu_id = Bytes(it, it+5);
   }
 
   ECUPort::~ECUPort()
   {
     close(m_file);
+  }
+
+  bool ECUPort::isAvailable(const Observable& obs) const
+  {
+    return true;
+  }
+
+  Bytes::const_iterator ECUPort::skipToData(const Bytes& message)
+  {
+    // Message structure is: HEADER, SRC, DEST, SIZE, DATA, CHKSM
+    return message.begin() + 5;
   }
 
   Bytes ECUPort::ECUInit() const
@@ -140,16 +152,12 @@ namespace SSM {
 	for(const auto& addr_byte: addr)
 	  addresses.push_back(addr_byte);
     
-    // Build the header of read request. Datasize is number of addresses plus 2
-    // since CMD_READ and CONTIN_RESP/SINGLE_RESP bytes are to be included (not
-    // the checksum byte though)
-    Bytes request = {HEADER,
-		     ECU,
-		     TOOL,
-		     Byte(addresses.size()+2),
-		     CMD_READ,
-		     (continuous ? CONTIN_RESP : SINGLE_RESP)};
-
+    // Build the header of read request. Datasize is number of
+    // addresses plus 2 since READ and CONTIN_RESP/SINGLE_RESP bytes
+    // are to be included (not the checksum byte though)
+    Bytes request = { HEADER, ECU, TOOL, Byte(addresses.size()+2), READ,
+		      (continuous ? CONTIN_RESP : SINGLE_RESP) };
+    
     // Attach the addresses to read
     request.insert(request.end(), addresses.begin(), addresses.end());
 
@@ -163,7 +171,7 @@ namespace SSM {
     sendRequest(buildReadRequest(observables, false));
 
     Bytes response = readECUPacket(false);
-    Bytes::const_iterator it = response.begin() + 5;
+    Bytes::const_iterator it = skipToData(response);
     Values values;
     for(const auto& obs: observables)
       {
@@ -187,7 +195,7 @@ namespace SSM {
       {
 	try { response = readECUPacket(false);}
 	catch(InvalidChecksum) { continue; }
-	it = response.begin() + 5;
+	it = skipToData(response);
 	for(int i(0); i< observables.size(); i++)
 	  {
 	    values[i] = observables[i]->convert(it);

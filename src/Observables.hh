@@ -75,7 +75,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "%"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x36}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x36}}}; }
   private:
     double convert(uint8_t value) const override { return value/2.55; };
   };
@@ -104,7 +104,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "C"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0xA6}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x01}, std::byte{0x06}}}; }
   private:
     double convert(uint8_t value) const override { return (value+40.0)*5.0; };
   };
