@@ -40,12 +40,14 @@ namespace SSM {
     Byte checkmask = Byte(0x01);
     for(int i(0); i<obs.markerBit(); i++)
       checkmask = checkmask << 2;
-    return (std::to_integer<int>(markerByte & checkmask)!=0);
+    return (std::to_integer<int>(markerByte & checkmask)==0);
   }
 
   Bytes::const_iterator ECUPort::skipToData(const Bytes& message)
   {
-    // Message structure is: HEADER, SRC, DEST, SIZE, DATA, CHKSM
+    // Message structure is: "HEADER | SRC | DEST | SIZE | 232 | DATA | CHKSM
+    // where '232' is a byte whose meaning is still unclear, but which appears
+    // in any response from the ECU.
     return message.begin() + 5;
   }
 
