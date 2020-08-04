@@ -166,6 +166,22 @@ namespace SSM {
     double convert(uint8_t value) const override { return (value+40.0)*5.0; };
   };
 
+  // Intake Air Temperature
+  // 8 bit value
+  // P0x012 = low byte
+  // Subtract 40 from value to get Degrees C
+  
+  class IntakeAirTemperature : public OneByteObservable {
+  public:
+    std::string unit() const override { return "C"; }
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x12}}}; }
+    int markerByte() const override { return 10;}
+    int markerBit()  const override { return  5;}
+  private:
+    double convert(uint8_t value) const override { return value-40.0; };
+  };
+
   // Manifold Relative Pressure
   // 8 bit value
   // P0x24 = low byte
@@ -206,5 +222,21 @@ namespace SSM {
     { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x62}}}; }
     int markerByte() const override { return 21;}
     int markerBit()  const override { return  7;}
+  };
+
+  class KnockSignal1 : public SwitchObservable {
+  public:
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x63}}}; }
+    int markerByte() const override { return 22;}
+    int markerBit()  const override { return  2;}
+  };
+
+  class KnockSignal2 : public SwitchObservable {
+  public:
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x63}}}; }
+    int markerByte() const override { return 22;}
+    int markerBit()  const override { return  1;}
   };
 }
