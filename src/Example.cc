@@ -37,11 +37,18 @@ int main(int argc, char** argv)
   SSM::EngineSpeed              engine_speed;
   SSM::ManifoldRelativePressure manifold_pressure;
   SSM::ExhaustGasTemperature    exhaust_gas_temp;
-
+  SSM::AirFuelLeanCorrection    af_lean_corr;
+  SSM::EngineLoad               en_load;
+  SSM::KnockingCorrection       kn_corr;
+  SSM::NeutralPositionSwitch    nt_sw;
   SSM::Observables observables { &battery_voltage,
 				 &engine_speed,
 				 &manifold_pressure,
-				 &exhaust_gas_temp };
+				 &exhaust_gas_temp,
+				 &af_lean_corr,
+				 &en_load,
+				 &kn_corr,
+				 &nt_sw };
 
   SSM::Values values = ECU.singleRead(observables);
   assert(observables.size() == values.size());
