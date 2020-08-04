@@ -51,16 +51,21 @@ namespace SSM {
 
   // Abstract base class for binary observables
 
-  class SwitchObservable : public OneByteObservable {
+  class SwitchObservable : public Observable {
   public:
     std::string unit() const override { return ""; }
-  private:
-    double convert(uint8_t value) const override
+    int numBytes() const override { return 1; }
+    double convert(Bytes::const_iterator input) const override
     {
+      uint8_t value = std::to_integer<uint8_t>(*input);
       uint8_t bitmask(1);
       for(int i(0); i<markerBit(); i++) bitmask *= 2;
       return ((value & bitmask) ? 1.0 : 0.0);
-    };
+      // Byte bitmask = Byte(0x01);
+      // const Byte& value = *input;
+      // for(int i(0); i<markerBit(); i++) bitmask = bitmask << 2;
+      // return (((value & bitmask) == Byte(0x00))?0.0:1.0);
+    }
   };
 
   /////////////////////
