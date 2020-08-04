@@ -40,6 +40,7 @@ int main(int argc, char** argv)
   SSM::IntakeAirTemperature     intake_temp;
   SSM::AirFuelLeanCorrection    af_lean_corr;
   SSM::EngineLoad               en_load;
+  SSM::ThrottlePedal            thr;
   SSM::KnockingCorrection       kn_corr;
   SSM::NeutralPositionSwitch    nt_sw;
   SSM::KnockSignal1             knock_1;
@@ -52,6 +53,7 @@ int main(int argc, char** argv)
 				 &intake_temp,
 				 &af_lean_corr,
 				 &en_load,
+				 &thr,
 				 &kn_corr,
 				 &nt_sw,
 				 &knock_1,
