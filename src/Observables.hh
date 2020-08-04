@@ -97,7 +97,18 @@ namespace SSM {
     int markerByte() const override { return 9;} 
     int markerBit()  const override { return 7;} 
   private:
-    double convert(uint8_t value) const override { return value/255*100.0; };
+    double convert(uint8_t value) const override { return value/255.0*100.0; };
+  };
+
+  class ThrottlePedal : public OneByteObservable {
+  public:
+    std::string unit() const override { return "%"; }
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x29}}}; }
+    int markerByte() const override { return 12;} 
+    int markerBit()  const override { return  2;} 
+  private:
+    double convert(uint8_t value) const override { return value/255.0*100.0; };
   };
 
   // Knock Correction
