@@ -13,7 +13,7 @@ namespace SSM {
     virtual double convert(Bytes::const_iterator input) const = 0;
     virtual std::string unit() const = 0;
     virtual std::vector<Address> addresses() const = 0;
-    virtual int numBytes()  const = 0;
+    virtual int numBytes()   const = 0;
     virtual int markerBit()  const = 0;
     virtual int markerByte() const = 0;
   };
@@ -49,6 +49,20 @@ namespace SSM {
     virtual double convert(uint16_t) const = 0;
   };
 
+  // Abstract base class for binary observables
+
+  class SwitchObservable : public OneByteObservable {
+  public:
+    std::string unit() const override { return ""; }
+  private:
+    double convert(uint8_t value) const override
+    {
+      uint8_t bitmask(1);
+      for(int i(0); i<markerBit(); i++) bitmask *= 2;
+      return ((value & bitmask) ? 1.0 : 0.0);
+    };
+  };
+
   /////////////////////
   // Derived classes //
   /////////////////////
@@ -67,6 +81,39 @@ namespace SSM {
     int markerBit()  const override { return  7;} 
   private:
     double convert(uint8_t value) const override { return value*0.08; };
+  };
+
+  // TODO: fix this
+  // Engine Load
+  // 8 bit value
+  // P0x07 = low byte
+  // Multiply value by 100.0 and divide by 255 to get percent
+
+  class EngineLoad : public OneByteObservable {
+  public:
+    std::string unit() const override { return "%"; }
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x07}}}; }
+    int markerByte() const override { return 9;} 
+    int markerBit()  const override { return 7;} 
+  private:
+    double convert(uint8_t value) const override { return value/255*100.0; };
+  };
+
+  // Knock Correction
+  // 8 bit value
+  // P0x22 = low byte
+  // Subtract 128 from value and divide by 2 to get degrees
+  
+  class KnockingCorrection : public OneByteObservable {
+  public:
+    std::string unit() const override { return "deg"; }
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x07}}}; }
+    int markerByte() const override { return 11;} 
+    int markerBit()  const override { return  1;} 
+  private:
+    double convert(uint8_t value) const override { return (value-128)*0.5; };
   };
 
   // TODO: Fix this
@@ -95,7 +142,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "C"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x00}, std::byte{0x08}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x08}}}; }
     int markerByte() const override { return 9;}
     int markerBit()  const override { return 6;}
   private:
@@ -128,7 +175,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "kPa"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x24}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x24}}}; }
     int markerByte() const override { return 12;}
     int markerBit()  const override { return  7;}
   private:
@@ -145,12 +192,19 @@ namespace SSM {
   public:
     std::string unit() const override { return "RPM"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0E}},
-	       Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x0F}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x0E}},
+	       Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x0F}}}; }
     int markerByte() const override { return 9;}
     int markerBit()  const override { return 0;}
   private:
     double convert(uint16_t value) const override { return value*0.25; };
   };
   
+  class NeutralPositionSwitch : public SwitchObservable {
+  public:
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x62}}}; }
+    int markerByte() const override { return 21;}
+    int markerBit()  const override { return  7;}
+  };
 }
