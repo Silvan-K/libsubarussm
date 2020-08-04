@@ -37,10 +37,8 @@ namespace SSM {
   bool ECUPort::isAvailable(const Observable& obs) const
   {
     Byte markerByte = m_init_response[obs.markerByte()];
-    Byte checkmask = Byte(0x01);
-    for(int i(0); i<obs.markerBit(); i++)
-      checkmask = checkmask << 2;
-    return (std::to_integer<int>(markerByte & checkmask)==0);
+    Byte checkmask = Byte(0x01) << obs.markerBit();
+    return std::to_integer<int>(markerByte & checkmask);
   }
 
   Bytes::const_iterator ECUPort::skipToData(const Bytes& message)

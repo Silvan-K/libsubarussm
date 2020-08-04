@@ -57,14 +57,9 @@ namespace SSM {
     int numBytes() const override { return 1; }
     double convert(Bytes::const_iterator input) const override
     {
-      uint8_t value = std::to_integer<uint8_t>(*input);
-      uint8_t bitmask(1);
-      for(int i(0); i<markerBit(); i++) bitmask *= 2;
-      return ((value & bitmask) ? 1.0 : 0.0);
-      // Byte bitmask = Byte(0x01);
-      // const Byte& value = *input;
-      // for(int i(0); i<markerBit(); i++) bitmask = bitmask << 2;
-      // return (((value & bitmask) == Byte(0x00))?0.0:1.0);
+      Byte value = *input;
+      Byte bitmask = Byte(0x01) << markerBit();
+      return ((value & bitmask) == Byte(0x00)) ? 0.0 : 1.0;
     }
   };
 
@@ -81,7 +76,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "Volt"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x1C}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x1C}}}; }
     int markerByte() const override { return 11;} 
     int markerBit()  const override { return  7;} 
   private:
@@ -98,7 +93,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "%"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x07}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x07}}}; }
     int markerByte() const override { return 9;} 
     int markerBit()  const override { return 7;} 
   private:
@@ -114,7 +109,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "deg"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x0}, std::byte{0x0}, std::byte{0x07}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x07}}}; }
     int markerByte() const override { return 11;} 
     int markerBit()  const override { return  1;} 
   private:
