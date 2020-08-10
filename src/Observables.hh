@@ -127,6 +127,24 @@ namespace SSM {
     double convert(uint8_t value) const override { return (value-128)*0.5; };
   };
 
+  // TODO: is this IAM or Feedback Knock Correction (FBKC) or
+  // Fine Learning Knock Correction?
+  // Learned Ignition Timing
+  // 8 bit value
+  // P0x028 = low byte
+  // Subtract 128 from value and divide by 2 to get degrees
+
+  class LearnedIgnitionTiming : public OneByteObservable {
+  public:
+    std::string unit() const override { return "deg"; }
+    std::vector<Address> addresses() const override
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x28}}}; }
+    int markerByte() const override { return 12;} 
+    int markerBit()  const override { return  3;} 
+  private:
+    double convert(uint8_t value) const override { return (value-128)*0.5; };
+  };
+
   // TODO: Fix this
   // Air/Fuel Lean Correction
   // 8 bit value
