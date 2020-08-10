@@ -120,7 +120,7 @@ namespace SSM {
   public:
     std::string unit() const override { return "deg"; }
     std::vector<Address> addresses() const override
-    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x07}}}; }
+    { return { Address{std::byte{0x00}, std::byte{0x00}, std::byte{0x22}}}; }
     int markerByte() const override { return 11;} 
     int markerBit()  const override { return  1;} 
   private:
