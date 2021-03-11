@@ -20,6 +20,20 @@ namespace SSM {
     ECUPort(const std::string& device_file_path);
     ~ECUPort();
 
+    template<typename ... ObsTypes>
+    Values singleRead_(ObsTypes ... args) {
+      Observables observables;
+      return singleRead(observables, args ...);
+    }
+
+    template<typename ObsType, typename ... ObsTypes>
+    Values singleRead(Observables& observables,
+		      ObsType firstOb,
+		      ObsTypes ... remainingObs) {
+      observables.push_back(&firstOb);
+      return singleRead(observables, remainingObs ...);
+    }
+
     Values singleRead(const Observables& observables) const;
     void continuousRead(const Observables& observables,
 			ReadValueCallback callback) const;
